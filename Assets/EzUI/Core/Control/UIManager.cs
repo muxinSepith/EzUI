@@ -2,307 +2,296 @@
 using System.Collections;
 using System.Collections.Generic;
 using System;
-using System.Text.RegularExpressions;
+//using System.Text.RegularExpressions;
+using EzUI;
 
 //[RequireComponent(typeof(UIStackManager))]
 //[RequireComponent(typeof(UILayerManager))]
 //[RequireComponent(typeof(UIAnimManager))]
 public class UIManager : MonoBehaviour
 {
-    public static GameObject s_UIManagerGo;
-    //public static UILayerManager s_UILayerManager; //UI层级管理器
-    //public static UIAnimManager s_UIAnimManager;   //UI动画管理器
-    //public static UIStackManager s_UIStackManager; //UI栈管理器
-    //public static Camera s_UIcamera;               //UICamera
 
-    //    static public Dictionary<string, List<UIWindowBase>> s_UIs     = new Dictionary<string, List<UIWindowBase>>(); //打开的UI
-    //    static public Dictionary<string, List<UIWindowBase>> s_hideUIs = new Dictionary<string, List<UIWindowBase>>(); //隐藏的UI
+    public static GameObject m_UIManagerGo;
+    public static Camera m_UIcamera;                    //UICamera
 
-    //    #region 初始化
+    public static UILayerManager m_UILayerManager;      //UI层级管理器
+    public static UIAnimManager m_UIAnimManager;        //UI动画管理器
+    public static UIStackManager m_UIStackManager;      //UI栈管理器
 
-    //    public static void Init()
+
+    public static Dictionary<string, List<UIWindowBase>> m_UIs = new Dictionary<string, List<UIWindowBase>>();      //打开的UI
+    public static Dictionary<string, List<UIWindowBase>> m_hideUIs = new Dictionary<string, List<UIWindowBase>>();  //隐藏的UI
+
+
+
+    #region 初始化
+
+    public static void Init()
+    {
+        GameObject instance = GameObject.Find("UIManager");
+
+        if (instance == null)
+        {
+            instance = ResourcesManager.Load<GameObject>("UIManager");
+        }
+
+        m_UIManagerGo = instance;
+
+        m_UIcamera = instance.GetComponentInChildren<Camera>();
+
+        m_UILayerManager = instance.GetComponent<UILayerManager>();
+        m_UIAnimManager = instance.GetComponent<UIAnimManager>();
+        m_UIStackManager = instance.GetComponent<UIStackManager>();
+
+        DontDestroyOnLoad(instance);
+    }
+
+    #endregion
+
+
+
+    //#region UI的打开与关闭方法
+
+    /// <summary>
+    /// 创建UI,如果不打开则存放在Hide列表中
+    /// </summary>
+    /// <typeparam name="T"></typeparam>
+    /// <returns></returns>
+    public static T CreateUIWindow<T>() where T : UIWindowBase
+    {
+        return (T)CreateUIWindow(typeof(T).Name);
+    }
+
+    public static UIWindowBase CreateUIWindow(string UIName)
+    {
+        GameObject UItmp = ResourcesManager.Load<GameObject>(UIName);
+        //UIPoolManager.CreateGameObject(UIName, m_UIManagerGo);
+
+        UIWindowBase UIbase = UItmp.GetComponent<UIWindowBase>();
+
+        UISystemEvent.Dispatch(UIbase, UIEvent.OnInit);  //派发OnInit事件
+        try
+        {
+            UIbase.Init(GetUIID(UIName));
+        }
+        catch (Exception e)
+        {
+            Debug.LogError("OnInit Exception: " + e.ToString());
+        }
+
+        AddHideUI(UIbase);
+
+        m_UILayerManager.SetLayer(UIbase);      //设置层级
+
+        return UIbase;
+    }
+
+    /// <summary>
+    /// 打开UI
+    /// </summary>
+    /// <param name="UIName">UI名</param>
+    /// <param name="callback">动画播放完毕回调</param>
+    /// <param name="objs">回调传参</param>`
+    /// <returns>返回打开的UI</returns>
+    public static UIWindowBase OpenUIWindow(string UIName, UICallBack callback = null, params object[] objs)
+    {
+        UIWindowBase UIbase = GetHideUI(UIName);
+
+        if (UIbase == null)
+        {
+            UIbase = CreateUIWindow(UIName);
+        }
+
+        RemoveHideUI(UIbase);
+        AddUI(UIbase);
+
+        UISystemEvent.Dispatch(UIbase, UIEvent.OnOpen);  //派发OnOpen事件
+        try
+        {
+            UIbase.OnUIOpen();
+        }
+        catch (Exception e)
+        {
+            Debug.LogError(UIName + " OnOpen Exception: " + e.ToString());
+        }
+
+        m_UIStackManager.OnUIOpen(UIbase);
+        m_UILayerManager.SetLayer(UIbase);      //设置层级
+        m_UIAnimManager.StartEnterAnim(UIbase, callback, objs); //播放动画
+        return UIbase;
+    }
+    public static T OpenUIWindow<T>() where T : UIWindowBase
+    {
+        return (T)OpenUIWindow(typeof(T).Name);
+    }
+
+    /// <summary>
+    /// 关闭UI
+    /// </summary>
+    /// <param name="UI">目标UI</param>
+    /// <param name="isPlayAnim">是否播放关闭动画</param>
+    /// <param name="callback">动画播放完毕回调</param>
+    /// <param name="objs">回调传参</param>
+    public static void CloseUIWindow(UIWindowBase UI, bool isPlayAnim = true, UICallBack callback = null, params object[] objs)
+    {
+        RemoveUI(UI);        //移除UI引用
+        UI.RemoveAllListener();
+        s_UILayerManager.RemoveUI(UI);
+
+        if (isPlayAnim)
+        {
+            //动画播放完毕删除UI
+            if (callback != null)
+            {
+                callback += CloseUIWindowCallBack;
+            }
+            else
+            {
+                callback = CloseUIWindowCallBack;
+            }
+
+            s_UIAnimManager.StartExitAnim(UI, callback, objs);
+        }
+        else
+        {
+            CloseUIWindowCallBack(UI, objs);
+        }
+    }
+    //static void CloseUIWindowCallBack(UIWindowBase UI, params object[] objs)
+    //{
+    //    UISystemEvent.Dispatch(UI, UIEvent.OnClose);  //派发OnClose事件
+    //    try
     //    {
-    //        GameObject instance = GameObject.Find("UIManager");
-
-    //        if (instance == null)
-    //        {
-    //            instance = GameObjectManager.CreateGameObject("UIManager");
-    //        }
-
-    //        s_UIManagerGo = instance;
-
-    //        s_UILayerManager = instance.GetComponent<UILayerManager>();
-    //        s_UIAnimManager  = instance.GetComponent<UIAnimManager>();
-    //        s_UIStackManager = instance.GetComponent<UIStackManager>();
-    //        s_UIcamera       = instance.GetComponentInChildren<Camera>();
-
-    //        DontDestroyOnLoad(instance);
+    //        UI.OnClose();
+    //    }
+    //    catch (Exception e)
+    //    {
+    //        Debug.LogError(UI.UIName + " OnClose Exception: " + e.ToString());
     //    }
 
-    //    ///异步加载UIMnager
-    //    public static void InitAsync()
-    //    {
-    //        GameObject instance = GameObject.Find("UIManager");
+    //    s_UIStackManager.OnUIClose(UI);
+    //    AddHideUI(UI);
+    //}
+    //public static void CloseUIWindow(string UIname, bool isPlayAnim = true, UICallBack callback = null, params object[] objs)
+    //{
+    //    UIWindowBase ui = GetUI(UIname);
 
-    //        if (instance == null)
-    //        {
-    //            GameObjectManager.CreateGameObjectByPoolAsync("UIManager",(obj)=> {
-    //                SetUIManager(obj);
-    //            });
-    //        }
-    //        else
-    //        {
-    //            SetUIManager(instance);
-    //        }
+    //    if (ui == null)
+    //    {
+    //        Debug.LogError("CloseUIWindow Error UI ->" + UIname + "<-  not Exist!");
+    //    }
+    //    else
+    //    {
+    //        CloseUIWindow(GetUI(UIname), isPlayAnim, callback, objs);
+    //    }
+    //}
+
+    //public static void CloseUIWindow<T>(bool isPlayAnim = true, UICallBack callback = null, params object[] objs) where T : UIWindowBase
+    //{
+    //    CloseUIWindow(typeof(T).Name, isPlayAnim, callback, objs);
+    //}
+
+    //public static UIWindowBase ShowUI(string UIname)
+    //{
+    //    UIWindowBase ui = GetUI(UIname);
+    //    return ShowUI(ui);
+    //}
+
+    //public static UIWindowBase ShowUI(UIWindowBase ui)
+    //{
+    //    UISystemEvent.Dispatch(ui, UIEvent.OnShow);  //派发OnShow事件
+    //    try
+    //    {
+    //        ui.Show();
+    //        ui.OnShow();
+    //    }
+    //    catch (Exception e)
+    //    {
+    //        Debug.LogError(ui.UIName + " OnShow Exception: " + e.ToString());
     //    }
 
-    //    static void SetUIManager(GameObject instance)
+    //    return ui;
+    //}
+
+    //public static UIWindowBase HideUI(string UIname)
+    //{
+    //    UIWindowBase ui = GetUI(UIname);
+    //    return HideUI(ui);
+    //}
+
+    //public static UIWindowBase HideUI(UIWindowBase ui)
+    //{
+    //    UISystemEvent.Dispatch(ui, UIEvent.OnHide);  //派发OnHide事件
+
+    //    try
     //    {
-    //        s_UIManagerGo = instance;
-
-    //        s_UILayerManager = instance.GetComponent<UILayerManager>();
-    //        s_UIAnimManager = instance.GetComponent<UIAnimManager>();
-    //        s_UIcamera = instance.GetComponentInChildren<Camera>();
-
-    //        DontDestroyOnLoad(instance);
+    //        ui.Hide();
+    //        ui.OnHide();
     //    }
+    //    catch (Exception e)
+    //    {
+    //        Debug.LogError(ui.UIName + " OnShow Exception: " + e.ToString());
+    //    }
+
+    //    return ui;
+    //}
+
+    //public static void HideOtherUI(string UIName)
+    //{
+    //    List<string> keys = new List<string>(s_UIs.Keys);
+    //    for (int i = 0; i < keys.Count; i++)
+    //    {
+    //        List<UIWindowBase> list = s_UIs[keys[i]];
+    //        for (int j = 0; j < list.Count; j++)
+    //        {
+    //            if (list[j].UIName != UIName)
+    //            {
+    //                HideUI(list[j]);
+    //            }
+    //        }
+    //    }
+    //}
+
+    //public static void ShowOtherUI(string UIName)
+    //{
+    //    List<string> keys = new List<string>(s_UIs.Keys);
+    //    for (int i = 0; i < keys.Count; i++)
+    //    {
+    //        List<UIWindowBase> list = s_UIs[keys[i]];
+    //        for (int j = 0; j < list.Count; j++)
+    //        {
+    //            if (list[j].UIName != UIName)
+    //            {
+    //                ShowUI(list[j]);
+    //            }
+    //        }
+    //    }
+    //}
+
+    ///// <summary>
+    ///// 移除全部UI
+    ///// </summary>
+    //public static void CloseAllUI(bool isPlayerAnim = false)
+    //{
+    //    List<string> keys = new List<string>(s_UIs.Keys);
+    //    for (int i = 0; i < keys.Count; i++)
+    //    {
+    //        List<UIWindowBase> list = s_UIs[keys[i]];
+    //        for (int j = 0; j < list.Count; j++)
+    //        {
+    //            CloseUIWindow(list[i], isPlayerAnim);
+    //        }
+    //    }
+    //}
+
+    //public static void CloseLastUI(UIType uiType = UIType.Normal)
+    //{
+    //    s_UIStackManager.CloseLastUIWindow(uiType);
+    //}
 
     //#endregion
 
-    //    #region UI的打开与关闭方法
 
-    //    /// <summary>
-    //    /// 创建UI,如果不打开则存放在Hide列表中
-    //    /// </summary>
-    //    /// <typeparam name="T"></typeparam>
-    //    /// <returns></returns>
-    //    public static T CreateUIWindow<T>() where T : UIWindowBase
-    //    {
-    //        return (T)CreateUIWindow(typeof(T).Name);
-    //    }
-    //    public static UIWindowBase CreateUIWindow(string UIName)
-    //    {
-    //        GameObject UItmp = GameObjectManager.CreateGameObject(UIName, s_UIManagerGo);
-    //        UIWindowBase UIbase = UItmp.GetComponent<UIWindowBase>();
-    //        UISystemEvent.Dispatch(UIbase, UIEvent.OnInit);  //派发OnInit事件
-    //        try{
-    //            UIbase.Init(GetUIID(UIName));
-    //        }
-    //        catch(Exception e)
-    //        {
-    //            Debug.LogError("OnInit Exception: " + e.ToString());}
-
-    //        AddHideUI(UIbase);
-
-    //        s_UILayerManager.SetLayer(UIbase);      //设置层级
-
-    //        return UIbase;
-    //    }
-
-    //    /// <summary>
-    //    /// 打开UI
-    //    /// </summary>
-    //    /// <param name="UIName">UI名</param>
-    //    /// <param name="callback">动画播放完毕回调</param>
-    //    /// <param name="objs">回调传参</param>`
-    //    /// <returns>返回打开的UI</returns>
-    //    public static UIWindowBase OpenUIWindow(string UIName, UICallBack callback = null, params object[] objs)
-    //    {
-    //        UIWindowBase UIbase = GetHideUI(UIName);
-
-    //        if (UIbase == null)
-    //        {
-    //            UIbase = CreateUIWindow(UIName);
-    //        }
-
-    //        RemoveHideUI(UIbase);
-    //        AddUI(UIbase);
-
-    //        UISystemEvent.Dispatch(UIbase, UIEvent.OnOpen);  //派发OnOpen事件
-    //        try
-    //        {
-    //            UIbase.OnOpen();
-    //        }
-    //        catch (Exception e)
-    //        {
-    //            Debug.LogError(UIName + " OnOpen Exception: " + e.ToString());
-    //        }
-
-    //        s_UIStackManager.OnUIOpen(UIbase);
-    //        s_UILayerManager.SetLayer(UIbase);      //设置层级
-    //        s_UIAnimManager.StartEnterAnim(UIbase, callback, objs); //播放动画
-    //        return UIbase;
-    //    }
-    //    public static T OpenUIWindow<T>() where T : UIWindowBase
-    //    {
-    //        return (T)OpenUIWindow(typeof(T).Name);
-    //    }
-
-    //    /// <summary>
-    //    /// 关闭UI
-    //    /// </summary>
-    //    /// <param name="UI">目标UI</param>
-    //    /// <param name="isPlayAnim">是否播放关闭动画</param>
-    //    /// <param name="callback">动画播放完毕回调</param>
-    //    /// <param name="objs">回调传参</param>
-    //    public static void CloseUIWindow(UIWindowBase UI,bool isPlayAnim = true ,UICallBack callback = null, params object[] objs)
-    //    {
-    //        RemoveUI(UI);        //移除UI引用
-    //        UI.RemoveAllListener();
-    //        s_UILayerManager.RemoveUI(UI);
-
-    //        if (isPlayAnim)
-    //        {
-    //            //动画播放完毕删除UI
-    //            if (callback != null)
-    //            {
-    //                callback += CloseUIWindowCallBack;
-    //            }
-    //            else
-    //            {
-    //                callback = CloseUIWindowCallBack;
-    //            }
-
-    //            s_UIAnimManager.StartExitAnim(UI, callback, objs);
-    //        }
-    //        else
-    //        {
-    //            CloseUIWindowCallBack(UI, objs);
-    //        }
-    //    }
-    //    static void CloseUIWindowCallBack(UIWindowBase UI, params object[] objs)
-    //    {
-    //        UISystemEvent.Dispatch(UI, UIEvent.OnClose);  //派发OnClose事件
-    //        try
-    //        {
-    //            UI.OnClose();
-    //        }
-    //        catch (Exception e)
-    //        {
-    //            Debug.LogError(UI.UIName + " OnClose Exception: " + e.ToString());
-    //        }
-
-    //        s_UIStackManager.OnUIClose(UI);
-    //        AddHideUI(UI);
-    //    }
-    //    public static void CloseUIWindow(string UIname, bool isPlayAnim = true, UICallBack callback = null, params object[] objs)
-    //    {
-    //        UIWindowBase ui = GetUI(UIname);
-
-    //        if (ui == null)
-    //        {
-    //            Debug.LogError("CloseUIWindow Error UI ->" + UIname + "<-  not Exist!");
-    //        }
-    //        else
-    //        {
-    //            CloseUIWindow(GetUI(UIname), isPlayAnim, callback, objs);
-    //        }
-    //    }
-
-    //    public static void CloseUIWindow<T>(bool isPlayAnim = true, UICallBack callback = null, params object[] objs) where T : UIWindowBase
-    //    {
-    //        CloseUIWindow(typeof(T).Name, isPlayAnim,callback, objs);
-    //    }
-
-    //    public static UIWindowBase ShowUI(string UIname)
-    //    {
-    //        UIWindowBase ui = GetUI(UIname);
-    //        return ShowUI(ui);
-    //    }
-
-    //    public static UIWindowBase ShowUI(UIWindowBase ui)
-    //    {
-    //        UISystemEvent.Dispatch(ui, UIEvent.OnShow);  //派发OnShow事件
-    //        try
-    //        {
-    //            ui.Show();
-    //            ui.OnShow();
-    //        }
-    //        catch (Exception e)
-    //        {
-    //            Debug.LogError(ui.UIName + " OnShow Exception: " + e.ToString());
-    //        }
-
-    //        return ui;
-    //    }
-
-    //    public static UIWindowBase HideUI(string UIname)
-    //    {
-    //        UIWindowBase ui = GetUI(UIname);
-    //        return HideUI(ui);
-    //    }
-
-    //    public static UIWindowBase HideUI(UIWindowBase ui)
-    //    {
-    //        UISystemEvent.Dispatch(ui, UIEvent.OnHide);  //派发OnHide事件
-
-    //        try
-    //        {
-    //            ui.Hide();
-    //            ui.OnHide();
-    //        }
-    //        catch (Exception e)
-    //        {
-    //            Debug.LogError(ui.UIName + " OnShow Exception: " + e.ToString());
-    //        }
-
-    //        return ui;
-    //    }
-
-    //    public static void HideOtherUI(string UIName)
-    //    {
-    //        List<string> keys = new List<string>(s_UIs.Keys);
-    //        for (int i = 0; i < keys.Count; i++)
-    //        {
-    //            List<UIWindowBase> list = s_UIs[keys[i]];
-    //            for (int j = 0; j < list.Count; j++)
-    //            {
-    //                if (list[j].UIName != UIName)
-    //                {
-    //                    HideUI(list[j]);
-    //                }
-    //            }
-    //        }
-    //    }
-
-    //    public static void ShowOtherUI(string UIName)
-    //    {
-    //        List<string> keys = new List<string>(s_UIs.Keys);
-    //        for (int i = 0; i < keys.Count; i++)
-    //        {
-    //            List<UIWindowBase> list = s_UIs[keys[i]];
-    //            for (int j = 0; j < list.Count; j++)
-    //            {
-    //                if (list[j].UIName != UIName)
-    //                {
-    //                    ShowUI(list[j]);
-    //                }
-    //            }
-    //        }
-    //    }
-
-    //    /// <summary>
-    //    /// 移除全部UI
-    //    /// </summary>
-    //    public static void CloseAllUI(bool isPlayerAnim = false)
-    //    {
-    //        List<string> keys = new List<string>(s_UIs.Keys);
-    //        for (int i = 0; i < keys.Count; i++)
-    //        {
-    //            List<UIWindowBase> list = s_UIs[keys[i]];
-    //            for(int j = 0;j<list.Count;j++)
-    //            {
-    //                CloseUIWindow(list[i], isPlayerAnim);
-    //            }
-    //        }
-    //    }
-
-    //    public static void CloseLastUI(UIType uiType = UIType.Normal)
-    //    {
-    //        s_UIStackManager.CloseLastUIWindow(uiType);
-    //    }
-
-    //#endregion
 
     //    #region UI的打开与关闭 异步方法
 
@@ -462,74 +451,74 @@ public class UIManager : MonoBehaviour
     //        throw new Exception("UIManager: GetUIWindowByEventKey error dont find UI name: ->" + eventKey + "<-  " + UIname);
     //    }
 
-    //    static bool GetIsExits(UIWindowBase UI)
-    //    {
-    //        if (!s_UIs.ContainsKey(UI.name))
-    //        {
-    //            return false;
-    //        }
-    //        else
-    //        {
-    //            return s_UIs[UI.name].Contains(UI);
-    //        }
-    //    }
+    static bool GetIsExits(UIWindowBase UI)
+    {
+        if (!m_UIs.ContainsKey(UI.name))
+        {
+            return false;
+        }
+        else
+        {
+            return m_UIs[UI.name].Contains(UI);
+        }
+    }
 
-    //    static void AddUI(UIWindowBase UI)
-    //    {
-    //        if (!s_UIs.ContainsKey(UI.name))
-    //        {
-    //            s_UIs.Add(UI.name, new List<UIWindowBase>());
-    //        }
+    static void AddUI(UIWindowBase UI)
+    {
+        if (!m_UIs.ContainsKey(UI.name))
+        {
+            m_UIs.Add(UI.name, new List<UIWindowBase>());
+        }
 
-    //        s_UIs[UI.name].Add(UI);
+        m_UIs[UI.name].Add(UI);
 
-    //        UI.Show();
-    //    }
+        UI.Show();
+    }
 
-    //    static void RemoveUI(UIWindowBase UI)
-    //    {
-    //        if (UI == null)
-    //        {
-    //            throw new Exception("UIManager: RemoveUI error l_UI is null: !");
-    //        }
+    static void RemoveUI(UIWindowBase UI)
+    {
+        if (UI == null)
+        {
+            throw new Exception("UIManager: RemoveUI error l_UI is null: !");
+        }
 
-    //        if (!s_UIs.ContainsKey(UI.name))
-    //        {
-    //            throw new Exception("UIManager: RemoveUI error dont find UI name: ->" + UI.name + "<-  " + UI);
-    //        }
+        if (!m_UIs.ContainsKey(UI.name))
+        {
+            throw new Exception("UIManager: RemoveUI error dont find UI name: ->" + UI.name + "<-  " + UI);
+        }
 
-    //        if (!s_UIs[UI.name].Contains(UI))
-    //        {
-    //            throw new Exception("UIManager: RemoveUI error dont find UI: ->" + UI.name + "<-  " + UI);
-    //        }
-    //        else
-    //        {
-    //            s_UIs[UI.name].Remove(UI);
-    //        }
-    //    }
+        if (!m_UIs[UI.name].Contains(UI))
+        {
+            throw new Exception("UIManager: RemoveUI error dont find UI: ->" + UI.name + "<-  " + UI);
+        }
+        else
+        {
+            m_UIs[UI.name].Remove(UI);
+        }
+    }
 
-    //    static int GetUIID(string UIname)
-    //    {
-    //        if (!s_UIs.ContainsKey(UIname))
-    //        {
-    //            return 0;
-    //        }
-    //        else
-    //        {
-    //            int id = s_UIs[UIname].Count;
+    static int GetUIID(string UIname)
+    {
+        if (!m_UIs.ContainsKey(UIname))
+        {
+            return 0;
+        }
+        else
+        {
+            int id = m_UIs[UIname].Count;
 
-    //            for (int i = 0; i < s_UIs[UIname].Count; i++)
-    //			{
-    //			    if(s_UIs[UIname][i].UIID == id)
-    //                {
-    //                    id++;
-    //                    i = 0;
-    //                }
-    //			}
+            for (int i = 0; i < m_UIs[UIname].Count; i++)
+            {
+                if (m_UIs[UIname][i].UIID == id)
+                {
+                    id++;
+                    i = 0;
+                }
+            }
 
-    //            return id;
-    //        }
-    //    }
+            return id;
+        }
+    }
 
     //    public static int GetNormalUICount()
     //    {
@@ -565,120 +554,120 @@ public class UIManager : MonoBehaviour
     //        s_hideUIs.Clear();
     //    }
 
-    //    /// <summary>
-    //    /// 获取一个隐藏的UI,如果有多个同名UI，则返回最后创建的那一个
-    //    /// </summary>
-    //    /// <param name="UIname">UI名</param>
-    //    /// <returns></returns>
-    //    public static UIWindowBase GetHideUI(string UIname)
-    //    {
-    //        if (!s_hideUIs.ContainsKey(UIname))
-    //        {
-    //            return null;
-    //        }
-    //        else
-    //        {
-    //            if (s_hideUIs[UIname].Count == 0)
-    //            {
-    //                return null;
-    //            }
-    //            else
-    //            {
-    //                UIWindowBase ui = s_hideUIs[UIname][s_hideUIs[UIname].Count - 1];
-    //                //默认返回最后创建的那一个
-    //                return ui;
-    //            }
-    //        }
-    //    }
+    /// <summary>
+    /// 获取一个隐藏的UI,如果有多个同名UI，则返回最后创建的那一个
+    /// </summary>
+    /// <param name="UIname">UI名</param>
+    /// <returns></returns>
+    public static UIWindowBase GetHideUI(string UIname)
+    {
+        if (!m_hideUIs.ContainsKey(UIname))
+        {
+            return null;
+        }
+        else
+        {
+            if (m_hideUIs[UIname].Count == 0)
+            {
+                return null;
+            }
+            else
+            {
+                UIWindowBase ui = m_hideUIs[UIname][m_hideUIs[UIname].Count - 1];
+                //默认返回最后创建的那一个
+                return ui;
+            }
+        }
+    }
 
-    //    static bool GetIsExitsHide(UIWindowBase UI)
-    //    {
-    //        if (!s_hideUIs.ContainsKey(UI.name))
-    //        {
-    //            return false;
-    //        }
-    //        else
-    //        {
-    //            return s_hideUIs[UI.name].Contains(UI);
-    //        }
-    //    }
+    static bool GetIsExitsHide(UIWindowBase UI)
+    {
+        if (!m_hideUIs.ContainsKey(UI.name))
+        {
+            return false;
+        }
+        else
+        {
+            return m_hideUIs[UI.name].Contains(UI);
+        }
+    }
 
-    //    static void AddHideUI(UIWindowBase UI)
-    //    {
-    //        if (!s_hideUIs.ContainsKey(UI.name))
-    //        {
-    //            s_hideUIs.Add(UI.name, new List<UIWindowBase>());
-    //        }
+    static void AddHideUI(UIWindowBase UI)
+    {
+        if (!m_hideUIs.ContainsKey(UI.name))
+        {
+            m_hideUIs.Add(UI.name, new List<UIWindowBase>());
+        }
 
-    //        s_hideUIs[UI.name].Add(UI);
+        m_hideUIs[UI.name].Add(UI);
 
-    //        UI.Hide();
-    //    }
+        UI.Hide();
+    }
 
 
-    //    static void RemoveHideUI(UIWindowBase UI)
-    //    {
-    //        if (UI == null)
-    //        {
-    //            throw new Exception("UIManager: RemoveUI error l_UI is null: !");
-    //        }
+    static void RemoveHideUI(UIWindowBase UI)
+    {
+        if (UI == null)
+        {
+            throw new Exception("UIManager: RemoveUI error l_UI is null: !");
+        }
 
-    //        if (!s_hideUIs.ContainsKey(UI.name))
-    //        {
-    //            throw new Exception("UIManager: RemoveUI error dont find: " + UI.name + "  " + UI);
-    //        }
+        if (!m_hideUIs.ContainsKey(UI.name))
+        {
+            throw new Exception("UIManager: RemoveUI error dont find: " + UI.name + "  " + UI);
+        }
 
-    //        if (!s_hideUIs[UI.name].Contains(UI))
-    //        {
-    //            throw new Exception("UIManager: RemoveUI error dont find: " + UI.name + "  " + UI);
-    //        }
-    //        else
-    //        {
-    //            s_hideUIs[UI.name].Remove(UI);
-    //        }
-    //    }
+        if (!m_hideUIs[UI.name].Contains(UI))
+        {
+            throw new Exception("UIManager: RemoveUI error dont find: " + UI.name + "  " + UI);
+        }
+        else
+        {
+            m_hideUIs[UI.name].Remove(UI);
+        }
+    }
 
     //#endregion
 }
 
 
 
-    #region UI事件 代理 枚举
+#region UI事件 代理 枚举
 
-    /// <summary>
-    /// UI回调
-    /// </summary>
-    /// <param name="objs"></param>
-    //public delegate void UICallBack(UIWindowBase UI, params object[] objs);
-    //public delegate void UIAnimCallBack(UIWindowBase UIbase, UICallBack callBack, params object[] objs);
+/// <summary>
+/// UI回调
+/// </summary>
+/// <param name="objs"></param>
+public delegate void UICallBack(UIWindowBase UI, params object[] objs);
+public delegate void UIAnimCallBack(UIWindowBase UIbase, UICallBack callBack, params object[] objs);
 
-    public enum UIType
-    {
-        GameUI,
+public enum UIType
+{
+    GameUI,
 
-        Fixed,
-        Normal,
-        TopBar,
-        PopUp
-    }
+    Fixed,
+    Normal,
+    TopBar,
+    PopUp
+}
 
-    public enum UIEvent
-    {
-        OnOpen,
-        OnClose,
-        OnHide,
-        OnShow,
+public enum UIEvent
+{
+    OnOpen,
+    OnClose,
+    OnHide,
+    OnShow,
 
-        OnInit,
-        OnDestroy,
+    OnInit,
+    OnDestroy,
 
-        OnRefresh,
+    OnRefresh,
 
-        OnStartEnterAnim,
-        OnCompleteEnterAnim,
+    OnStartEnterAnim,
+    OnCompleteEnterAnim,
 
-        OnStartExitAnim,
-        OnCompleteExitAnim,
-    }
+    OnStartExitAnim,
+    OnCompleteExitAnim,
+}
 
 #endregion

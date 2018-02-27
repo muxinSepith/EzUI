@@ -2,84 +2,90 @@
 using System.Collections;
 using System.Collections.Generic;
 
-public class UILayerManager : MonoBehaviour 
+
+namespace EzUI
 {
- //   public Transform m_GameUILayerParent;
- //   public Transform m_FixedLayerParent;
- //   public Transform m_NormalLayerParent;
- //   public Transform m_TopbarLayerParent;
- //   public Transform m_PopUpLayerParent;
 
- //   public List<UIWindowBase> normalUIList = new List<UIWindowBase>();
+    public class UILayerManager : MonoBehaviour
+    {
+        public Transform m_GameUILayerParent;
+        public Transform m_FixedLayerParent;
+        public Transform m_NormalLayerParent;
+        public Transform m_TopbarLayerParent;
+        public Transform m_PopUpLayerParent;
 
- //   public void Awake()
- //   {
- //       if (m_GameUILayerParent == null)
- //       {
- //           Debug.LogError("UILayerManager :GameUILayerParent is null!");
- //       }
+        public List<UIWindowBase> normalUIList = new List<UIWindowBase>();
 
- //       if (m_FixedLayerParent == null)
- //       {
- //           Debug.LogError("UILayerManager :FixedLayerParent is null!");
- //       }
+        public void Awake()
+        {
+            if (m_GameUILayerParent == null)
+            {
+                Debug.LogError("UILayerManager :GameUILayerParent is null!");
+            }
 
- //       if (m_NormalLayerParent == null)
- //       {
- //           Debug.LogError("UILayerManager :NormalLayerParent is null!");
- //       }
+            if (m_FixedLayerParent == null)
+            {
+                Debug.LogError("UILayerManager :FixedLayerParent is null!");
+            }
 
- //       if (m_TopbarLayerParent == null)
- //       {
- //           Debug.LogError("UILayerManager :TopbarLayerParent is null!");
- //       }
+            if (m_NormalLayerParent == null)
+            {
+                Debug.LogError("UILayerManager :NormalLayerParent is null!");
+            }
 
- //       if (m_PopUpLayerParent == null)
- //       {
- //           Debug.LogError("UILayerManager :popUpLayerParent is null!");
- //       }
- //   }
+            if (m_TopbarLayerParent == null)
+            {
+                Debug.LogError("UILayerManager :TopbarLayerParent is null!");
+            }
 
-	//public void SetLayer(UIWindowBase ui)
- //   {
- //       RectTransform rt = ui.GetComponent<RectTransform>();
- //       switch (ui.m_UIType)
- //       {
- //           case UIType.GameUI: ui.transform.SetParent(m_GameUILayerParent); break;
- //           case UIType.Fixed: ui.transform.SetParent(m_FixedLayerParent); break;
- //           case UIType.Normal:
- //               ui.transform.SetParent(m_NormalLayerParent);
- //               normalUIList.Add(ui);
- //               break;
- //           case UIType.TopBar: ui.transform.SetParent(m_TopbarLayerParent); break;
- //           case UIType.PopUp: ui.transform.SetParent(m_PopUpLayerParent); break;
- //       }
+            if (m_PopUpLayerParent == null)
+            {
+                Debug.LogError("UILayerManager :popUpLayerParent is null!");
+            }
+        }
 
- //       rt.localScale = Vector3.one;
- //       rt.sizeDelta = Vector2.zero;
+        public void SetLayer(UIWindowBase ui)
+        {
+            RectTransform rt = ui.GetComponent<RectTransform>();
+            switch (ui.m_UIType.UIFormType)
+            {
+                case UIFormType.GameUI: ui.transform.SetParent(m_GameUILayerParent); break;
+                case UIFormType.Fixed: ui.transform.SetParent(m_FixedLayerParent); break;
+                case UIFormType.Normal:
+                    ui.transform.SetParent(m_NormalLayerParent);
+                    normalUIList.Add(ui);
+                    break;
+                case UIFormType.TopBar: ui.transform.SetParent(m_TopbarLayerParent); break;
+                case UIFormType.PopUp: ui.transform.SetParent(m_PopUpLayerParent); break;
+            }
 
- //       if (ui.m_UIType != UIType.GameUI)
- //       {
- //           rt.anchorMin = Vector2.zero;
- //           rt.anchorMax = Vector3.one;
+            rt.localScale = Vector3.one;
+            rt.sizeDelta = Vector2.zero;
 
- //           rt.sizeDelta = Vector2.zero;
- //           rt.anchoredPosition = Vector3.zero;
- //           rt.SetAsLastSibling();
- //       }
- //   }
+            if (ui.m_UIType.UIFormType != UIFormType.GameUI)
+            {
+                rt.anchorMin = Vector2.zero;
+                rt.anchorMax = Vector3.one;
 
- //   public void RemoveUI(UIWindowBase ui)
- //   {
- //       switch (ui.m_UIType)
- //       {
- //           case UIType.GameUI: break;
- //           case UIType.Fixed: break;
- //           case UIType.Normal:
- //               normalUIList.Remove(ui);
- //               break;
- //           case UIType.TopBar: break;
- //           case UIType.PopUp:  break;
- //       }
- //   }
+                rt.sizeDelta = Vector2.zero;
+                rt.anchoredPosition = Vector3.zero;
+                rt.SetAsLastSibling();
+            }
+        }
+
+        public void RemoveUI(UIWindowBase ui)
+        {
+            switch (ui.m_UIType.UIFormType)
+            {
+                case UIFormType.GameUI: break;
+                case UIFormType.Fixed: break;
+                case UIFormType.Normal:
+                    normalUIList.Remove(ui);
+                    break;
+                case UIFormType.TopBar: break;
+                case UIFormType.PopUp: break;
+            }
+        }
+    }
+
 }

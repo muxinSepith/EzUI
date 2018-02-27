@@ -15,9 +15,11 @@ namespace EzUI
 
     public enum UIFormType
     {
+        GameUI,
         Normal,
         Fixed,
         PopUp,
+        TopBar,
     }
 
     public enum UIFormShowMode

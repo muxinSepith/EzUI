@@ -77,7 +77,10 @@ namespace EzUI
         #endregion
 
 
-        #region 注册事件
+        #region 注册监听事件
+
+        protected List<Enum> m_EventNames = new List<Enum>();
+        protected List<EventHandRegisterInfo> m_EventListeners = new List<EventHandRegisterInfo>();
 
         protected void RegisterBtnClick(Button btn, Action<GameObject> action)
         {
@@ -85,6 +88,47 @@ namespace EzUI
             {
                 action(btn.gameObject);
             });
+        }
+
+        public virtual void RemoveAllListener()
+        {
+            for (int i = 0; i < m_EventListeners.Count; i++)
+            {
+                m_EventListeners[i].RemoveListener();
+            }
+            m_EventListeners.Clear();
+
+            for (int i = 0; i < m_OnClickEvents.Count; i++)
+            {
+                m_OnClickEvents[i].RemoveListener(true);
+            }
+            m_OnClickEvents.Clear();
+
+            for (int i = 0; i < m_LongPressEvents.Count; i++)
+            {
+                m_LongPressEvents[i].RemoveListener(true);
+            }
+            m_LongPressEvents.Clear();
+
+            #region 拖动事件
+            for (int i = 0; i < m_DragEvents.Count; i++)
+            {
+                m_DragEvents[i].RemoveListener(true);
+            }
+            m_DragEvents.Clear();
+
+            for (int i = 0; i < m_BeginDragEvents.Count; i++)
+            {
+                m_BeginDragEvents[i].RemoveListener(true);
+            }
+            m_BeginDragEvents.Clear();
+
+            for (int i = 0; i < m_EndDragEvents.Count; i++)
+            {
+                m_EndDragEvents[i].RemoveListener(true);
+            }
+            m_EndDragEvents.Clear();
+            #endregion
         }
 
         #endregion
